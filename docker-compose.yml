@@ -1,0 +1,68 @@
+version: '2'
+
+services: 
+  db:
+    image: mariadb:10.5
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - ./mysql:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - TZ=${TZ}
+  app:
+    volumes:
+      - ./app:/var/www/mysql
+
+    image: php:8.2.2-apache
+    links: 
+      - db
+    ports:
+      - 8282:80
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - TZ=${TZ}
+    command: 
+    - /bin/bash
+    - -c
+    - |
+      # install compose
+      echo install 'compose'
+      php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+      php -r "if (hash_file('sha384', 'composer-setup.php') === '55ce33d7678c5a611085589f1f3ddf8b3c52d662cd01d4ba75c0ee0459970c2200a51f492d557530c71c15d8dba01eae') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+      php composer-setup.php
+      php -r "unlink('composer-setup.php');"
+
+
+      # install git and zip extension
+      echo install git
+      apt-get update -y
+
+
+      curl -sSLf \
+        -o /usr/local/bin/install-php-extensions \
+        https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions && \
+      chmod +x /usr/local/bin/install-php-extensions && \
+      install-php-extensions pdo_mysql gd zip
+
+
+      # install 
+      mv composer.phar /usr/local/bin/composer
+      cd /var/www/html
+      
+      # install tastyigniter
+      composer create-project tastyigniter/tastyigniter .
+
+      echo "install with artisan"
+      php artisan igniter:install --no-interaction
+
+      ls /var/www/html
+      echo "end"
+
+ 
